@@ -161,6 +161,25 @@ config SENSORS_HMC5843_I2C
 	  - hmc5843_core (core functions)
 	  - hmc5843_i2c (support for HMC5843, HMC5883, HMC5883L and HMC5983)
 
+config SENSORS_MMC5983
+	tristate
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+
+config SENSORS_MMC5983_I2C
+	tristate "Memsic MMC5983 3-Axis Magnetometer (I2C)"
+	select SENSORS_MMC5983
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Say Y here to add support for the Memsic MMC5983
+	  3-Axis Magnetometer (digital compass).
+
+	  This driver can also be compiled as a set of modules.
+	  If so, these modules will be created:
+	  - mmc5983_core (core functions)
+	  - mmc5983_i2c (support for MMC5983)
+
 config SENSORS_HMC5843_SPI
 	tristate "Honeywell HMC5983 3-Axis Magnetometer (SPI)"
 	depends on SPI_MASTER
