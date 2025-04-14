@@ -43,7 +43,7 @@ static struct mmc_pwrseq_sd8787 *global_pwrseq; // For sysfs access
 
 // Sysfs attribute to manually control GPIOs
 static ssize_t power_ctl_store(struct device *dev, struct device_attribute *attr,
-			       const char *buf, size_t count)
+				const char *buf, size_t count)
 {
 	struct mmc_pwrseq_sd8787 *pwrseq = global_pwrseq;
 	bool power_on;
@@ -70,7 +70,7 @@ static ssize_t power_ctl_store(struct device *dev, struct device_attribute *attr
 }
 
 static ssize_t power_ctl_show(struct device *dev, struct device_attribute *attr,
-			      char *buf)
+				char *buf)
 {
 	struct mmc_pwrseq_sd8787 *pwrseq = global_pwrseq;
 	int reset_state, powerdown_state;
@@ -108,27 +108,26 @@ static void mmc_pwrseq_wilc1000_pre_power_on(struct mmc_host *host)
 {
 	struct mmc_pwrseq_sd8787 *pwrseq = to_pwrseq_sd8787(host->pwrseq);
 
-    	mutex_lock(&pwrseq->gpio_lock);
 	/* The pwrdn_gpio is really CHIP_EN, reset_gpio is RESETN */
-	 if (!pwrseq->use_sysfs_control) { // Only control power if not using sysfs
+	if (!pwrseq->use_sysfs_control) { // Only control power if not using sysfs
+		mutex_lock(&pwrseq->gpio_lock);
 		gpiod_set_value_cansleep(pwrseq->pwrdn_gpio, 1);
 		msleep(5);
 		gpiod_set_value_cansleep(pwrseq->reset_gpio, 1);
+		mutex_unlock(&pwrseq->gpio_lock);
 	}
-	mutex_unlock(&pwrseq->gpio_lock);
+}
 
-}\
 static void mmc_pwrseq_wilc1000_power_off(struct mmc_host *host)
 {
 	struct mmc_pwrseq_sd8787 *pwrseq = to_pwrseq_sd8787(host->pwrseq);
 
-    mutex_lock(&pwrseq->gpio_lock);
 	if (!pwrseq->use_sysfs_control) { // Only control power if not using sysfs
+		mutex_lock(&pwrseq->gpio_lock);
 		gpiod_set_value_cansleep(pwrseq->reset_gpio, 0);
 		gpiod_set_value_cansleep(pwrseq->pwrdn_gpio, 0);
+		mutex_unlock(&pwrseq->gpio_lock);
 	}
-	
-    mutex_unlock(&pwrseq->gpio_lock);
 }
 static const struct mmc_pwrseq_ops mmc_pwrseq_wilc1000_ops = {
 	.pre_power_on = mmc_pwrseq_wilc1000_pre_power_on,
@@ -151,11 +150,14 @@ static int mmc_pwrseq_sd8787_probe(struct platform_device *pdev)
 	struct mmc_pwrseq_sd8787 *pwrseq;
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
-    	int ret;
+	int ret;
 
 	pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
 	if (!pwrseq)
 		return -ENOMEM;
+
+	// Initialize mutex for GPIO access
+	mutex_init(&pwrseq->gpio_lock);
 
 	match = of_match_node(mmc_pwrseq_sd8787_of_match, pdev->dev.of_node);
 
@@ -170,20 +172,21 @@ static int mmc_pwrseq_sd8787_probe(struct platform_device *pdev)
 	pwrseq->pwrseq.dev = dev;
 	pwrseq->pwrseq.ops = match->data;
 	pwrseq->pwrseq.owner = THIS_MODULE;
-	pwrseq->use_sysfs_control = false; // Default to MMC control
+	// Default to MMC control
+	pwrseq->use_sysfs_control = false;
 
 	platform_set_drvdata(pdev, pwrseq);
 
-	// Register sysfs attribute
-	global_pwrseq = pwrseq; // Set global reference for sysfs
-	
+	// Set global reference for sysfs
+	global_pwrseq = pwrseq;
+
 	ret = device_create_file(dev, &dev_attr_power_ctl);
 	if (ret) {
 		dev_err(dev, "sysfs attribute\n");
 		return ret;
 	}
 	dev_info(dev, "Sysfs attribute /sys/devices/platform/%s/power_ctl created\n", dev_name(&pdev->dev));
-	
+
 	return mmc_pwrseq_register(&pwrseq->pwrseq);
 }
 
