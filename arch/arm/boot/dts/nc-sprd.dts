@@ -758,6 +758,16 @@
 		spi-cpha;
 		reset-gpios= <&pioC 24 0>;
 		dc-gpios= <&pioA 24 0>;
-		status = "okay";
+		status = "disabled";
 	};
+
+    fpga_mgr_spi: fpga@0 {
+        compatible = "xlnx,fpga-slave-serial";
+        reg = <1>;                          /* chip select 1 */
+        spi-max-frequency = <10000000>;     /* CCLK ~= 10 MHz */
+		prog_b-gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+        done-gpios   = <&pioB 23 GPIO_ACTIVE_HIGH>;
+		init-b-gpios = <&pioA 29 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+    };
 };

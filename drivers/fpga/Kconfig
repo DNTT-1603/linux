@@ -243,4 +243,12 @@ config FPGA_MGR_VERSAL_FPGA
 	  configure the programmable logic(PL).
 
 	  To compile this as a module, choose M here.
+
+config FPGA_MGR_XILINX_SPI_LOADER
+        tristate "Xilinx SPI FPGA loader helper"
+        depends on FPGA_MGR_XILINX_SPI && FPGA
+        help
+          Provides a sysfs interface (/sys/class/fpga_loader/loader0/firmware)
+          to trigger fpga_mgr_load() on the xilinx-spi FPGA manager.
+
 endif # FPGA
