@@ -509,6 +509,13 @@
 				 AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
 		};
 
+		pinctrl_spi5_no_cs: spi5_pins_no_cs {
+			atmel,pins =
+				<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+		};
+
 		pinctrl_flx6_default: flx6_twi {
 			atmel,pins =
 				<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
@@ -561,7 +568,7 @@
 
 	gpio_keys {
 		pinctrl_key_gpio_default: pinctrl_key_gpio {
-			atmel,pins = 
+			atmel,pins =
 			<
 			AT91_PIOD 18 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
 			AT91_PIOC 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
@@ -741,7 +748,9 @@
 
 &spi5 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_lcd>;
+	pinctrl-0 = <&pinctrl_spi5_no_cs>;
+	cs-gpios = <&pioA 8 GPIO_ACTIVE_LOW>,   /* CS0 */
+               <&pioA 7 GPIO_ACTIVE_LOW>;  /* CS1 */
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
@@ -758,16 +767,17 @@
 		spi-cpha;
 		reset-gpios= <&pioC 24 0>;
 		dc-gpios= <&pioA 24 0>;
-		status = "disabled";
+		status = "okay";
 	};
 
-    fpga_mgr_spi: fpga@0 {
+    fpga_mgr_spi: fpga@1 {
         compatible = "xlnx,fpga-slave-serial";
         reg = <1>;                          /* chip select 1 */
-        spi-max-frequency = <10000000>;     /* CCLK ~= 10 MHz */
+        spi-max-frequency = <5000000>;     /* CCLK ~= 5 MHz */
+		spi-cpha;
 		prog_b-gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
-        done-gpios   = <&pioB 23 GPIO_ACTIVE_HIGH>;
-		init-b-gpios = <&pioA 29 GPIO_ACTIVE_HIGH>;
+		init-b-gpios = <&pioA 29 GPIO_ACTIVE_LOW>;
+		done-gpios   = <&pioB 13 GPIO_ACTIVE_HIGH>;
 		status = "okay";
     };
 };
