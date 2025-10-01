@@ -51,6 +51,6 @@ obj-$(CONFIG_FPGA_DFL_NIOS_INTEL_PAC_N3000)	+= dfl-n3000-nios.o
 obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
 
 # Custom FPGA Loader Helpers
-  obj-$(CONFIG_FPGA_MGR_XILINX_SPI_LOADER) += xilinx-spi-loader.o
-  obj-$(CONFIG_FPGA_XILINX_SPI_TEST)      += xilinx-test-driver.o
-  
+obj-$(CONFIG_FPGA_MGR_XILINX_SPI_LOADER) += xilinx-spi-loader.o
+obj-$(CONFIG_FPGA_XILINX_SPI_TEST)      += xilinx-test-driver.o
+
