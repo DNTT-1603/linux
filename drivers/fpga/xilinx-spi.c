@@ -150,8 +150,6 @@ static int xilinx_spi_write(struct fpga_manager *mgr, const char *buf,
 				ret);
 			return ret;
 		}
-		dev_info(&mgr->dev, "[DEBUG] %zu bytes remaining\n",
-				remaining - stride);
 		fw_data += stride;
 	}
 	return 0;
@@ -209,7 +207,10 @@ static int xilinx_spi_write_complete(struct fpga_manager *mgr,
 			return 0;
 		}
 	}
-
+	dev_info(&mgr->dev, "[Debug] Write_completed: (prog_b: %d) (init_b: %d), (done: %d) \n", \
+					gpiod_get_raw_value_cansleep(conf->prog_b),	\
+					gpiod_get_raw_value_cansleep(conf->init_b),	\
+					gpiod_get_raw_value_cansleep(conf->done));
 	if (conf->init_b) {
 		ret = gpiod_get_value(conf->init_b);
 		if (ret < 0) {

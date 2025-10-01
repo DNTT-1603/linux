@@ -108,16 +108,17 @@ static int xlnx_get_gpios(struct xlnx_test *t)
     t->prog_b = gpiod_get(dev, "prog_b", GPIOD_OUT_HIGH);
     if (IS_ERR(t->prog_b))
         return dev_err_probe(dev, PTR_ERR(t->prog_b), "prog_b gpio\n");
-    dev_info(dev, "PROG_B pin: %d\n", desc_to_gpio(t->prog_b));
-    
+
     t->init_b = gpiod_get_optional(dev, "init-b", GPIOD_IN);
     if (IS_ERR(t->init_b))
         return dev_err_probe(dev, PTR_ERR(t->init_b), "init-b gpio\n");
-    dev_info(dev, "INIT_B pin: %d\n", desc_to_gpio(t->init_b));
+    
     t->done = gpiod_get(dev, "done", GPIOD_IN);
     if (IS_ERR(t->done))
         return dev_err_probe(dev, PTR_ERR(t->done), "done gpio\n");
-    dev_info(dev, "DONE pin: %d\n", desc_to_gpio(t->done));
+    dev_info(dev, "[DEBUG] (Prog_B: %d), (Init_B: %d), (DONE pin: %d)\n", desc_to_gpio(t->prog_b), \
+            desc_to_gpio(t->init_b),\
+            desc_to_gpio(t->done));
     return 0;
 }
 
@@ -182,16 +183,13 @@ static int xlnx_program_fpga(struct xlnx_test *t, const char *fw_name)
 
     /* PROGRAM_B: Low -> small delay -> High */
     gpiod_set_raw_value_cansleep(t->prog_b, 0);
-    dev_info(&t->spi->dev, "[DEBUG] CP_1 PROG_B: (%d)\n", gpiod_get_raw_value_cansleep(t->prog_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_1 INIT_B: (%d)\n", gpiod_get_raw_value_cansleep(t->init_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_1 DONE: (%d)\n", gpiod_get_raw_value_cansleep(t->done));
+    dev_info(&t->spi->dev, "[DEBUG] [ Start Init Write] (Prog_B: %d), (Init_B: %d), (DONE pin: %d)\n", gpiod_get_raw_value_cansleep(t->prog_b), \
+            gpiod_get_raw_value_cansleep(t->init_b),\
+            gpiod_get_raw_value_cansleep(t->done));
 
     /* Xilinx spec requires min 500 ns; sleep 2ms for safety */
     msleep(2);
     gpiod_set_raw_value_cansleep(t->prog_b, 1);
-    dev_info(&t->spi->dev, "[DEBUG] CP_2 PROG_B: (%d)\n", gpiod_get_raw_value_cansleep(t->prog_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_2 INIT_B: (%d)\n", gpiod_get_raw_value_cansleep(t->init_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_2 DONE: (%d)\n", gpiod_get_raw_value_cansleep(t->done));
 
     /* Wait INIT_B = High (ready) */
     ret = xlnx_wait_gpio_high(t->init_b, init_timeout_ms);
@@ -199,10 +197,11 @@ static int xlnx_program_fpga(struct xlnx_test *t, const char *fw_name)
         dev_err(&t->spi->dev, "INIT_B did not go high (%d)\n", ret);
         return ret;
     }
-    dev_info(&t->spi->dev, "[DEBUG] CP_3 PROG_B: (%d)\n", gpiod_get_raw_value_cansleep(t->prog_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_3 INIT_B: (%d)\n", gpiod_get_raw_value_cansleep(t->init_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_3 DONE: (%d)\n", gpiod_get_raw_value_cansleep(t->done));
-    dev_info(&t->spi->dev, "INIT_B: (%d), starting SPI transfer\n",gpiod_get_raw_value_cansleep(t->init_b));
+    dev_info(&t->spi->dev, "[DEBUG] [ Finish Init Write] (Prog_B: %d), (Init_B: %d), (DONE pin: %d)\n", gpiod_get_raw_value_cansleep(t->prog_b), \
+            gpiod_get_raw_value_cansleep(t->init_b),\
+            gpiod_get_raw_value_cansleep(t->done));
+    dev_info(&t->spi->dev, "[DEBUG] starting SPI transfer\n");
+
     /* Fetch firmware from /lib/firmware */
     ret = request_firmware(&fw, fw_name, &t->spi->dev);
     if (ret) {
@@ -223,7 +222,7 @@ static int xlnx_program_fpga(struct xlnx_test *t, const char *fw_name)
             goto out_fw;
         }
         off += stride;
-        if (!(off & ((64 * 1024) - 1))) /* log every 64KiB */
+        if (!(off & ((128 * 1024) - 1))) /* log every 64KiB */
             dev_info(&t->spi->dev, ".. %zu/%zu\n", off, fw->size);
     }
 
@@ -255,16 +254,20 @@ static int xlnx_program_fpga(struct xlnx_test *t, const char *fw_name)
 
     if (!ret) {
         int initv = t->init_b ? gpiod_get_raw_value_cansleep(t->init_b) : 1;
-        dev_err(&t->spi->dev, "DONE low after transfer (INIT_B=%d)\n", initv);
+        dev_err(&t->spi->dev, "[DEBUG] Fail: DONE low after transfer (INIT_B=%d)\n", initv);
+        dev_err(&t->spi->dev, "[DEBUG] (Prog_B: %d), (Init_B: %d), (DONE pin: %d)\n", \
+                gpiod_get_raw_value_cansleep(t->prog_b), \
+                gpiod_get_raw_value_cansleep(t->init_b),\
+                gpiod_get_raw_value_cansleep(t->done));
         ret = -ETIMEDOUT;
         goto out_fw;
     }
 
-    dev_info(&t->spi->dev, "DONE is high: configuration SUCCESS\n");
-    dev_info(&t->spi->dev, "[DEBUG] CP_4 PROG_B: (%d)\n", gpiod_get_raw_value_cansleep(t->prog_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_4 INIT_B: (%d)\n", gpiod_get_raw_value_cansleep(t->init_b));
-    dev_info(&t->spi->dev, "[DEBUG] CP_4 DONE: (%d)\n", gpiod_get_raw_value_cansleep(t->done));
-
+    dev_info(&t->spi->dev, "[DEBUG] DONE is high: configuration SUCCESS\n");
+    dev_info(&t->spi->dev, "[DEBUG] [ Finish Configuration] (Prog_B: %d), (Init_B: %d), (DONE pin: %d)\n", \
+            gpiod_get_raw_value_cansleep(t->prog_b), \
+            gpiod_get_raw_value_cansleep(t->init_b),\
+            gpiod_get_raw_value_cansleep(t->done));
 
     g.last_bytes = fw->size;
     ret = 0;
