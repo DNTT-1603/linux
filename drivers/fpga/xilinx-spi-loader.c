@@ -13,6 +13,8 @@
 
 #define DEFAULT_COMPAT "xlnx,fpga-slave-serial"
 #define MAX_FW_NAME 256
+/* Fixed firmware to load when user writes "start" */
+#define FIXED_FW_NAME "xilinx-fpga-fw.bin" /* looked up under /lib/firmware */
 
 
 struct xspi_loader {
@@ -33,7 +35,7 @@ static char manager_compat[64] = DEFAULT_COMPAT;
 module_param_string(manager_compat, manager_compat, sizeof(manager_compat),0444);
 MODULE_PARM_DESC(manager_compat, "compatible string to search for if manager_path is empty (default: \"xlnx,fpga-slave-serial\")");
 
-static unsigned int config_timeout_us = 100000;
+static unsigned int config_timeout_us = 2000000;
 module_param(config_timeout_us, uint, 0644);
 MODULE_PARM_DESC(config_timeout_us,"DONE timeout supplied to fpga_mgr_load() (microseconds)");
 
@@ -73,7 +75,8 @@ static int xspi_loader_program(const char *fw_name)
 		goto out_put_mgr;
 	}
 
-	dup = kstrdup(fw_name, GFP_KERNEL);
+    // dup = kstrdup(fw_name, GFP_KERNEL);
+	dup = devm_kstrdup(&mgr->dev, fw_name, GFP_KERNEL);
 	if (!dup) {
 		ret = -ENOMEM;
 		goto out_free_info;
@@ -99,33 +102,36 @@ out_put_mgr:
 }
 
 static ssize_t firmware_store(struct device *dev, struct device_attribute *attr,
-			      const char *buf, size_t count)
+                              const char *buf, size_t count)
 {
-	char *kbuf;
-	int ret;
+    char *kbuf;
+    int ret;
 
-	if (count >= MAX_FW_NAME)
-		return -EINVAL;
+    /* Accept only the trigger word "start" (ignore newlines/whitespace). */
+    kbuf = kstrndup(buf, count, GFP_KERNEL);
+    if (!kbuf)
+        return -ENOMEM;
 
-	kbuf = kstrndup(buf, count, GFP_KERNEL);
-	if (!kbuf)
-		return -ENOMEM;
+    strim(kbuf);
+    if (!kbuf[0]) {
+        kfree(kbuf);
+        return -EINVAL;
+    }
 
-	strim(kbuf);
-	if (!kbuf[0]) {
-		kfree(kbuf);
-		return -EINVAL;
-	}
+    if (!sysfs_streq(kbuf, "start")) {
+        kfree(kbuf);
+        return -EINVAL;
+    }
 
-	mutex_lock(&loader.lock);
-	ret = xspi_loader_program(kbuf);
-	if (!ret)
-		strscpy(loader.last_fw, kbuf, sizeof(loader.last_fw));
-	loader.last_status = ret;
-	mutex_unlock(&loader.lock);
+    mutex_lock(&loader.lock);
+    ret = xspi_loader_program(FIXED_FW_NAME);
+    if (!ret)
+        strscpy(loader.last_fw, FIXED_FW_NAME, sizeof(loader.last_fw));
+    loader.last_status = ret;
+    mutex_unlock(&loader.lock);
 
-	kfree(kbuf);
-	return ret ? ret : count;
+    kfree(kbuf);
+    return ret ? ret : count;
 }
 static DEVICE_ATTR_WO(firmware);
 
@@ -170,8 +176,10 @@ static int __init xspi_loader_init(void)
 		return ret;
 	}
 
-	dev_info(loader.dev,"ready write a firmware name to firmware to configure the FPGA\n");
-	return 0;
+    dev_info(loader.dev,
+         "ready: echo start > /sys/class/fpga_loader/loader0/firmware to load %s from /lib/firmware\n",
+         FIXED_FW_NAME);
+    return 0;
 }
 
 static void __exit xspi_loader_exit(void)

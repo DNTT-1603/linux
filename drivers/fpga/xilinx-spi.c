@@ -64,7 +64,7 @@ static int wait_for_init_b(struct fpga_manager *mgr, int value,
 			   unsigned long alt_udelay)
 {
 	struct xilinx_spi_conf *conf = mgr->priv;
-	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+	unsigned long timeout = jiffies + msecs_to_jiffies(2000);
 
 	if (conf->init_b) {
 		while (time_before(jiffies, timeout)) {
@@ -121,6 +121,9 @@ static int xilinx_spi_write_init(struct fpga_manager *mgr,
 		dev_err(&mgr->dev, "Unexpected DONE pin state...\n");
 		return -EIO;
 	}
+	dev_info(&mgr->dev, "[Debug] Write_Init (raw_value): (prog_b: %d) (init_b: %d), (done: %d) \n",gpiod_get_raw_value_cansleep(conf->prog_b),	\
+				gpiod_get_raw_value_cansleep(conf->init_b),	\
+				gpiod_get_raw_value_cansleep(conf->done));
 
 	/* program latency */
 	usleep_range(7500, 7600);
@@ -147,9 +150,10 @@ static int xilinx_spi_write(struct fpga_manager *mgr, const char *buf,
 				ret);
 			return ret;
 		}
+		dev_info(&mgr->dev, "[DEBUG] %zu bytes remaining\n",
+				remaining - stride);
 		fw_data += stride;
 	}
-
 	return 0;
 }
 
@@ -180,24 +184,34 @@ static int xilinx_spi_write_complete(struct fpga_manager *mgr,
 	 * scheduled out for more than 'timeout', we still check for DONE
 	 * before giving up and we apply 8 extra CCLK cycles in all cases.
 	 */
+
 	while (!expired) {
 		expired = time_after(jiffies, timeout);
 
 		done = get_done_gpio(mgr);
-		if (done < 0)
+		if (done < 0) {
+			dev_err(&mgr->dev ,"[DEBUG] done pin: %d\n",done);
 			return done;
+		}
 
 		ret = xilinx_spi_apply_cclk_cycles(conf);
-		if (ret)
+		if (ret) {
+			dev_err(&mgr->dev,"[DEBUG] apply cclk cycles failed: %d\n",ret);
 			return ret;
+		}
 
-		if (done)
+		if (done) {
+			dev_info(&mgr->dev ,"[DEBUG] Load fpga FW sucessful\n");
+			dev_info(&mgr->dev, "[Debug] Write_completed: (prog_b: %d) (init_b: %d), (done: %d) \n", \
+					gpiod_get_raw_value_cansleep(conf->prog_b),	\
+					gpiod_get_raw_value_cansleep(conf->init_b),	\
+					gpiod_get_raw_value_cansleep(conf->done));
 			return 0;
+		}
 	}
 
 	if (conf->init_b) {
 		ret = gpiod_get_value(conf->init_b);
-
 		if (ret < 0) {
 			dev_err(&mgr->dev, "Error reading INIT_B (%d)\n", ret);
 			return ret;
@@ -252,6 +266,8 @@ static int xilinx_spi_probe(struct spi_device *spi)
 				   &xilinx_spi_ops, conf);
 	if (!mgr)
 		return -ENOMEM;
+	
+	dev_info(&spi->dev, "[DEBUG] PROG_B: %d, Init_B: %d, Done: %d\n",desc_to_gpio(conf->prog_b), desc_to_gpio(conf->init_b),desc_to_gpio(conf->done));
 
 	return devm_fpga_mgr_register(&spi->dev, mgr);
 }

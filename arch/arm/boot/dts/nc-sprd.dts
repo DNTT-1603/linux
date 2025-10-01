@@ -506,7 +506,8 @@
 				<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
 				 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
 				 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE
-				 AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+				 AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 7 AT91_PERIPH_B AT91_PINCTRL_NONE>;
 		};
 
 		pinctrl_spi5_no_cs: spi5_pins_no_cs {
@@ -748,9 +749,7 @@
 
 &spi5 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi5_no_cs>;
-	cs-gpios = <&pioA 8 GPIO_ACTIVE_LOW>,   /* CS0 */
-               <&pioA 7 GPIO_ACTIVE_LOW>;  /* CS1 */
+	pinctrl-0 = <&pinctrl_lcd>;
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
