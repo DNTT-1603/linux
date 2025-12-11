@@ -14,8 +14,8 @@
  * - Checks DONE and reports status.
  *
  * Exposes a simple sysfs interface:
- *   echo start > /sys/class/fpga_test/loader0/firmware
- * which triggers loading /lib/firmware/design.bin
+ *   echo xilinx-fpga-fw.bin > /sys/class/fpga_test/loader0/firmware
+ * which triggers loading /lib/firmware/xilinx-fpga-fw.bin
  */
 
 #include <linux/delay.h>
@@ -277,7 +277,7 @@ out_fw:
     return ret;
 }
 
-/* sysfs: echo start > firmware */
+/* sysfs: echo <fw_name> > firmware */
 static ssize_t firmware_store(struct device *dev, struct device_attribute *attr,
                               const char *buf, size_t count)
 {
@@ -289,16 +289,18 @@ static ssize_t firmware_store(struct device *dev, struct device_attribute *attr,
         return -ENOMEM;
     strim(kbuf);
 
-    if (!sysfs_streq(kbuf, "start")) {
+    /* Expect a firmware filename, not the literal "start" */
+    if (!kbuf[0]) {
         kfree(kbuf);
         return -EINVAL;
     }
-    kfree(kbuf);
 
     mutex_lock(&g.lock);
-    ret = xlnx_program_fpga(&g, firmware_name);
+    ret = xlnx_program_fpga(&g, kbuf);
     g.last_status = ret;
     mutex_unlock(&g.lock);
+
+    kfree(kbuf);
 
     return ret ? ret : count;
 }
@@ -358,8 +360,8 @@ static int __init xlnx_test_init(void)
         goto err_destroy_class;
     }
 
-    dev_info(g.dev, "ready: echo start > %s/firmware to load %s\n",
-             dev_name(g.dev), firmware_name);
+    dev_info(g.dev, "ready: echo %s > %s/firmware to load %s\n",
+             firmware_name, dev_name(g.dev), firmware_name);
     return 0;
 
 err_destroy_class:
