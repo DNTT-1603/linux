@@ -62,7 +62,7 @@ static char firmware_name[128] = DEFAULT_FW_NAME;
 module_param_string(firmware_name, firmware_name, sizeof(firmware_name), 0644);
 MODULE_PARM_DESC(firmware_name, "Firmware file under /lib/firmware to stream over SPI");
 
-static unsigned int spi_hz = 10000000; /* 10 MHz default */
+static unsigned int spi_hz = 50000000; /* 50 MHz default */
 module_param(spi_hz, uint, 0644);
 MODULE_PARM_DESC(spi_hz, "SPI clock frequency in Hz (default 10MHz)");
 
