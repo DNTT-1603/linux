@@ -18,7 +18,7 @@
 		i2c1 = &i2c6;
 		serial1 = &uart6;		// Bluetooth
 		serial2 = &uart1;		// FPGA
-		serial3 = &uart9;		// GPS
+		// serial3 = &uart9;		// GPS
 		serial4 = &uart3;		// LTE
 		// serial2 = &uart7;
 	};
@@ -328,17 +328,28 @@
 };
 
 &flx9 {
-	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
 	status = "okay";
 
-	// Uart port for GPS
-	uart9: serial@200 {
+	i2c9: i2c@600 {
 		#address-cells = <1>;
 		#size-cells = <0>;
+		dmas = <0>, <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx9_default>;
+		pinctrl-0 = <&pinctrl_flx9_twi>;
 		status = "okay";
+		gyro@1e {
+			compatible = "honeywell,hmc5883l";
+			reg = <0x1e>;
+			status = "disabled";
+		};
+		imu@68 {
+			compatible = "invensense,icm20948";
+			reg = <0x68>;
+			status = "okay";
+		};
 	};
+
 };
 
 &flx10 {
@@ -501,6 +512,14 @@
 				<AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE
 				 AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
 		};
+		pinctrl_flx3_spi: flx3_spi {
+			atmel,pins =
+				<AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_PULL_UP
+				 AT91_PIOC 26 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOC 25 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+		};
+
 		pinctrl_lcd: lcd_spi {
 			atmel,pins =
 				<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
@@ -537,6 +556,12 @@
 			atmel,pins =
 				<AT91_PIOC 8 AT91_PERIPH_C AT91_PINCTRL_NONE
 				 AT91_PIOC 9 AT91_PERIPH_C AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx9_twi: flx9_twi {
+			atmel,pins =
+				<AT91_PIOC 8 AT91_PERIPH_C AT91_PINCTRL_PULL_UP
+				AT91_PIOC 9 AT91_PERIPH_C AT91_PINCTRL_PULL_UP>;
 		};
 
 		pinctrl_flx10_default: flx10_twi {
@@ -759,5 +784,25 @@
 		reset-gpios= <&pioC 24 0>;
 		dc-gpios= <&pioA 24 0>;
 		status = "okay";
+	};
+};
+
+&flx3 {
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
+	status = "okay";
+
+	spi3: spi@400 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx3_spi>;
+		status = "okay";
+
+		spidev@0 {
+			compatible = "linux,spidev";
+			reg = <0>;
+			spi-max-frequency = <2000000>;
+			spi-cpha;
+		};
 	};
 };
