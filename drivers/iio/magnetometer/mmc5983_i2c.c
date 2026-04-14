@@ -9,7 +9,7 @@ static const struct regmap_config mmc5983_regmap_config = {
     .val_bits = 8,
 };
 
-static int mmc5983_i2c_probe(struct i2c_client *client)
+static int mmc5983_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct regmap *regmap;
 
@@ -28,17 +28,22 @@ static const struct of_device_id mmc5983_of_match[] = {
     { .compatible = "memsic,mmc5983" },
     { },
 };
-
 MODULE_DEVICE_TABLE(of, mmc5983_of_match);
+
+static const struct i2c_device_id mmc5983_i2c_id[] = {
+    { "mmc5983", 0 },
+    { }
+};
+MODULE_DEVICE_TABLE(i2c, mmc5983_i2c_id);
 
 static struct i2c_driver mmc5983_driver = {
     .driver = {
         .name = "mmc5983",
         .of_match_table = mmc5983_of_match,
     },
-    //TODO: add power management
-    .probe_new = mmc5983_i2c_probe,
+    .probe = mmc5983_i2c_probe,
     .remove = mmc5983_i2c_remove,
+    .id_table = mmc5983_i2c_id,
 };
 
 module_i2c_driver(mmc5983_driver);
