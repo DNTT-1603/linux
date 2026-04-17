@@ -49,3 +49,7 @@ obj-$(CONFIG_FPGA_DFL_NIOS_INTEL_PAC_N3000)	+= dfl-n3000-nios.o
 
 # Drivers for FPGAs which implement DFL
 obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
+
+#FPGA Manager Drivers which support DFL
+obj-$(CONFIG_FPGA_XILINX_FW_UPDATE_SPI)      += xilinx-fw-update-spi.o
+

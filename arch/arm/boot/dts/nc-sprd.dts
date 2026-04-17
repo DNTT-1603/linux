@@ -506,7 +506,15 @@
 				<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
 				 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
 				 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE
-				 AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+				 AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 7 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_spi5_no_cs: spi5_pins_no_cs {
+			atmel,pins =
+				<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
+				 AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
 		};
 
 		pinctrl_flx6_default: flx6_twi {
@@ -561,7 +569,7 @@
 
 	gpio_keys {
 		pinctrl_key_gpio_default: pinctrl_key_gpio {
-			atmel,pins = 
+			atmel,pins =
 			<
 			AT91_PIOD 18 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
 			AT91_PIOC 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
@@ -760,4 +768,15 @@
 		dc-gpios= <&pioA 24 0>;
 		status = "okay";
 	};
+
+    fpga_mgr_spi: fpga@1 {
+        compatible = "xlnx,fpga-slave-serial";
+        reg = <1>;                          /* chip select 1 */
+        spi-max-frequency = <50000000>;     /* CCLK ~= 10 MHz */
+		spi-cpha;
+		prog_b-gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+		init-b-gpios = <&pioA 29 GPIO_ACTIVE_LOW>;
+		done-gpios   = <&pioB 13 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+    };
 };
