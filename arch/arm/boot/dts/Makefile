@@ -19,6 +19,7 @@ subdir-y += intel
 subdir-y += marvell
 subdir-y += mediatek
 subdir-y += microchip
+subdir-y += nucare
 subdir-y += moxa
 subdir-y += nspire
 subdir-y += nuvoton
