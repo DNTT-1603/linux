@@ -336,7 +336,7 @@
 	clock-frequency = <32768>;
 };
 
-&shutdown_controller {
+&poweroff {
 	debounce-delay-us = <976>;
 	status = "okay";
 

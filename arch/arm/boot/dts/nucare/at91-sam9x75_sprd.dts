@@ -1,0 +1,501 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * at91-sam9x75_sprd.dts - Device Tree file for the Nucare SPRD board
+ *                         on the Microchip SAM9X75 SOM.
+ *
+ * Migrated from the SAM9X60-based nc-sprd.dts. Built on sam9x75_som.dtsi,
+ * which already provides: dbgu/serial0, NAND, QSPI boot flash, the mcp16502
+ * PMIC (i2c6), GMAC, RTT, TRNG, watchdog and the poweroff/shutdown controller.
+ *
+ * IMPORTANT (SAM9X60 -> SAM9X75 port):
+ * The Flexcom-to-function mapping and the PIO peripheral function-selects
+ * differ completely between the two SoCs. Peripherals whose SAM9X75 pins are
+ * verified (from sam9x7.dtsi or a SAM9X75 reference board) are enabled below.
+ * Peripherals whose pins depend on the SAM9X75 SPRD/SOM schematic are left
+ * status = "disabled" and tagged "FIXME(SPRD-9x75)" with placeholder pins
+ * carried over from the SAM9X60 design - DO NOT enable them before replacing
+ * those pins with the schematic-correct SAM9X75 values, otherwise the kernel
+ * may drive contended balls.
+ *
+ * Author: Nam Tran <nam.tran@nucaremed.com>
+ */
+/dts-v1/;
+#include "arm/microchip/sam9x75_som.dtsi"
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Nucare SPRD (SAM9X75)";
+	compatible = "nucare,sam9x75-sprd", "microchip,sam9x7", "atmel,at91sam9";
+
+	aliases {
+		/* i2c0 = &i2c6 (PMIC) comes from sam9x75_som.dtsi */
+		i2c1 = &i2c7;		/* EEPROM */
+		i2c2 = &i2c10;		/* Battery / charger */
+		serial1 = &uart0;	/* Bluetooth - FIXME pins */
+		serial2 = &uart1;	/* FPGA */
+		serial3 = &uart9;	/* GPS - FIXME pins */
+		serial4 = &uart3;	/* LTE - FIXME pins */
+	};
+
+	/* stdout-path / chosen and memory (512 MB) come from sam9x75_som.dtsi.
+	 * FIXME(SPRD-9x75): confirm the SOM RAM size matches this board.
+	 */
+
+	keys: gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_key_gpio_default>;
+		status = "okay";
+
+		/* FIXME(SPRD-9x75): confirm these GPIO lines against the
+		 * SAM9X75 SPRD schematic (carried over from SAM9X60).
+		 */
+		btn_user: button-user {
+			label = "PB_USER";
+			gpios = <&pioD 18 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_PROG1>;
+			wakeup-source;
+		};
+
+		btn_left: button-left {
+			label = "MENU_LEFT";
+			gpios = <&pioC 27 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_TRIGGER_HAPPY1>;
+			wakeup-source;
+		};
+
+		btn_center: button-center {
+			label = "MENU_CENTER";
+			gpios = <&pioC 28 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_TRIGGER_HAPPY2>;
+			wakeup-source;
+		};
+
+		btn_right: button-right {
+			label = "MENU_RIGHT";
+			gpios = <&pioC 29 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_TRIGGER_HAPPY3>;
+			wakeup-source;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_leds>;
+		status = "okay";
+
+		/* FIXME(SPRD-9x75): confirm LED GPIO lines against the schematic.
+		 * PD17/PD19/PD21 are GPIO-only on SAM9X75 and unused by the SOM.
+		 */
+		red {
+			label = "red";
+			gpios = <&pioD 17 GPIO_ACTIVE_HIGH>;
+		};
+
+		green {
+			label = "green";
+			gpios = <&pioD 19 GPIO_ACTIVE_HIGH>;
+		};
+
+		blue {
+			label = "blue";
+			gpios = <&pioD 21 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "1334 Card";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&i2s>;
+		simple-audio-card,frame-master = <&i2s>;
+		simple-audio-card,cpu {
+			#sound-dai-cells = <0>;
+			sound-dai = <&i2s>;
+		};
+		codec_dai: simple-audio-card,codec {
+			#sound-dai-cells = <0>;
+			sound-dai = <&codec_out>;
+		};
+	};
+
+	bat: battery {
+		compatible = "simple-battery";
+		precharge-current-microamp = <150000>;
+		charge-term-current-microamp = <150000>;
+		constant-charge-current-max-microamp = <2000000>;
+		constant-charge-voltage-max-microvolt = <4200000>;
+		voltage-max-design-microvolt = <4200000>;
+		voltage-min-design-microvolt = <2800000>;
+		energy-full-design-microwatt-hours = <12060000>;
+		charge-full-design-microamp-hours = <3350000>;
+	};
+
+	codec_out: max98357a {
+		compatible = "maxim,max98357a";
+		#sound-dai-cells = <0>;
+		/* FIXME(SPRD-9x75): SD_MODE GPIO carried over from SAM9X60 (PC31);
+		 * verify against the SAM9X75 SPRD schematic.
+		 */
+		sdmode-gpios = <&pioC 31 GPIO_ACTIVE_HIGH>;
+		sdmode-delay = <5>;
+		status = "okay";
+	};
+};
+
+/* ===== Verified peripherals (SAM9X75 pins confirmed) ===== */
+
+&adc {
+	vddana-supply = <&vdd_3v3>;
+	vref-supply = <&vdd_3v3>;
+	/* Only the external trigger pin (PB18, verified) is muxed here.
+	 * FIXME(SPRD-9x75): add the analog channel pin group once the
+	 * SAM9X75 ADC channel routing is known (SAM9X60 used PB14).
+	 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_adtrg_default>;
+	status = "okay";
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&flx1 {
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+	status = "okay";
+
+	/* FPGA control UART */
+	uart1: serial@200 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx1_default>;
+		status = "okay";
+	};
+};
+
+&flx7 {
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
+	status = "okay";
+
+	i2c7: i2c@600 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		dmas = <0>, <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx7_default>;
+		i2c-analog-filter;
+		i2c-digital-filter;
+		i2c-digital-filter-width-ns = <35>;
+		status = "okay";
+
+		/* FIXME(SPRD-9x75): confirm the EEPROM sits on this bus
+		 * (it was on i2c0/flx0 on the SAM9X60 design). Pins PC0/PC1
+		 * are the verified SAM9X75 flx7 TWI function.
+		 */
+		eeprom@53 {
+			compatible = "atmel,24c02";
+			reg = <0x53>;
+			pagesize = <16>;
+			status = "okay";
+		};
+	};
+};
+
+&flx10 {
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
+	status = "okay";
+
+	i2c10: i2c@600 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		dmas = <0>, <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx10_default>;
+		i2c-analog-filter;
+		i2c-digital-filter;
+		i2c-digital-filter-width-ns = <35>;
+		status = "okay";
+
+		fuel: fuel@55 {
+			compatible = "ti,bq27441";
+			reg = <0x55>;
+			monitored-battery = <&bat>;
+		};
+
+		bq24196: charger@6b {
+			compatible = "ti,bq24196";
+			reg = <0x6b>;
+			/* FIXME(SPRD-9x75): charger IRQ. The SAM9X60 design used
+			 * pioA 1, which is the sdmmc0 CMD line on SAM9X75 - it
+			 * cannot be reused. Provide a free SAM9X75 GPIO and
+			 * re-enable the two properties below.
+			 * interrupt-parent = <&pioA>;
+			 * interrupts = <1 IRQ_TYPE_EDGE_FALLING 1>;
+			 */
+			ti,system-minimum-microvolt = <3200000>;
+			monitored-battery = <&bat>;
+			omit-battery-class;
+
+			usb_otg_vbus: usb-otg-vbus { };
+		};
+	};
+};
+
+&i2s {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2s_default>;
+	#sound-dai-cells = <0>;
+	status = "okay";
+};
+
+&sdmmc0 {
+	bus-width = <4>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdmmc0_default>;
+	disable-wp;
+	/* FIXME(SPRD-9x75): card-detect GPIO (SAM9X60 used pioB 12). Set the
+	 * correct SAM9X75 line, or add "broken-cd"/"non-removable" as needed.
+	 * cd-gpios = <&pioX YY GPIO_ACTIVE_LOW>;
+	 */
+	status = "okay";
+};
+
+&tcb {
+	timer0: timer@0 {
+		compatible = "atmel,tcb-timer";
+		reg = <0>;
+	};
+
+	timer1: timer@1 {
+		compatible = "atmel,tcb-timer";
+		reg = <1>;
+	};
+};
+
+/* ===== Disabled until the SAM9X75 schematic pin map is known ===== */
+
+&can0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_can0_default>;
+	status = "disabled"; /* shares PA26/27 with dbgu/serial0 */
+};
+
+&can1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_can1_default>;
+	status = "disabled"; /* shares PA28/29 with flx1/uart1 (FPGA) */
+};
+
+&flx0 {
+	/* Bluetooth UART. Relocated off flx6 (now the PMIC TWI on the SOM). */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+	status = "disabled"; /* FIXME(SPRD-9x75): set flx0 USART pins, then enable */
+
+	uart0: serial@200 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx0_uart_fixme>;
+		status = "disabled";
+	};
+};
+
+&flx3 {
+	/* LTE modem UART */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+	status = "disabled"; /* FIXME(SPRD-9x75): set flx3 USART pins, then enable */
+
+	uart3: serial@200 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx3_uart_fixme>;
+		status = "disabled";
+	};
+};
+
+&flx5 {
+	/* LCD (ST7789V) + FPGA configuration SPI */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
+	status = "disabled"; /* FIXME(SPRD-9x75): set flx5 SPI pins, then enable */
+
+	spi5: spi@400 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx5_spi_fixme>;
+		status = "disabled";
+
+		/* FIXME(SPRD-9x75): all GPIOs below are SAM9X60 values. */
+		lcd: lcd@0 {
+			compatible = "sitronix,st7789v";
+			reg = <0>;
+			buswidth = <8>;
+			rotation = <180>;
+			spi-max-frequency = <50000000>;
+			write-only;
+			spi-cpol;
+			spi-cpha;
+			reset-gpios = <&pioC 24 0>;
+			dc-gpios = <&pioA 24 0>;
+			status = "disabled";
+		};
+
+		fpga_mgr_spi: fpga@1 {
+			compatible = "xlnx,fpga-slave-serial";
+			reg = <1>;
+			spi-max-frequency = <50000000>;
+			spi-cpha;
+			prog_b-gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+			init-b-gpios = <&pioA 29 GPIO_ACTIVE_LOW>;
+			done-gpios = <&pioB 13 GPIO_ACTIVE_HIGH>;
+			status = "disabled";
+		};
+	};
+};
+
+&flx9 {
+	/* GPS UART */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+	status = "disabled"; /* FIXME(SPRD-9x75): set flx9 USART pins, then enable */
+
+	uart9: serial@200 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_flx9_uart_fixme>;
+		status = "disabled";
+	};
+};
+
+&gmac {
+	/* SAM9X60 SPRD had no Ethernet. The SOM enables GMAC by default.
+	 * FIXME(SPRD-9x75): confirm whether the SAM9X75 SOM PHY is used on
+	 * this board; remove this override to re-enable Ethernet.
+	 */
+	status = "disabled";
+};
+
+&ohci0 {
+	num-ports = <1>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb_default_fixme>;
+	status = "disabled"; /* FIXME(SPRD-9x75): set VBUS GPIO(s), then enable */
+};
+
+&usb0 {
+	/* USB device / OTG */
+	status = "disabled"; /* FIXME(SPRD-9x75): set VBUS/ID GPIOs, then enable */
+};
+
+&pinctrl {
+	/* --- Verified SAM9X75 pin groups --- */
+	adc {
+		pinctrl_adtrg_default: adtrg-default {
+			atmel,pins = <AT91_PIOB 18 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+		};
+	};
+
+	can0 {
+		pinctrl_can0_default: can0-default {
+			atmel,pins = <AT91_PIOA 26 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* CANRX0 */
+				      AT91_PIOA 27 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;	/* CANTX0 */
+		};
+	};
+
+	can1 {
+		pinctrl_can1_default: can1-default {
+			atmel,pins = <AT91_PIOA 28 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* CANTX1 */
+				      AT91_PIOA 29 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;	/* CANRX1 */
+		};
+	};
+
+	flexcom {
+		pinctrl_flx1_default: flx1-default {
+			atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE
+				      AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx7_default: flx7-default {
+			atmel,pins = <AT91_PIOC 0 AT91_PERIPH_C AT91_PINCTRL_PULL_UP
+				      AT91_PIOC 1 AT91_PERIPH_C AT91_PINCTRL_PULL_UP>;
+		};
+
+		pinctrl_flx10_default: flx10-default {
+			atmel,pins = <AT91_PIOC 16 AT91_PERIPH_C AT91_PINCTRL_PULL_UP
+				      AT91_PIOC 17 AT91_PERIPH_C AT91_PINCTRL_PULL_UP>;
+		};
+	};
+
+	i2s {
+		pinctrl_i2s_default: i2s-default {
+			atmel,pins =
+				<AT91_PIOB 26 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SCK */
+				 AT91_PIOB 15 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SWS */
+				 AT91_PIOB 16 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SDIN */
+				 AT91_PIOB 17 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SDOUT */
+				 AT91_PIOB 25 AT91_PERIPH_D AT91_PINCTRL_NONE>;		/* I2SMCK */
+		};
+	};
+
+	sdmmc0 {
+		pinctrl_sdmmc0_default: sdmmc0-default {
+			atmel,pins =
+				<AT91_PIOA 2 AT91_PERIPH_A (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,			/* CK */
+				<AT91_PIOA 1 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* CMD */
+				<AT91_PIOA 0 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT0 */
+				<AT91_PIOA 3 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT1 */
+				<AT91_PIOA 4 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT2 */
+				<AT91_PIOA 5 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>;	/* DAT3 */
+		};
+	};
+
+	gpio_keys {
+		/* FIXME(SPRD-9x75): SAM9X60-derived lines; verify routing. */
+		pinctrl_key_gpio_default: key-gpio-default {
+			atmel,pins =
+				<AT91_PIOD 18 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				 AT91_PIOC 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				 AT91_PIOC 28 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				 AT91_PIOC 29 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+		};
+	};
+
+	leds {
+		/* FIXME(SPRD-9x75): SAM9X60-derived lines; verify routing. */
+		pinctrl_gpio_leds: gpio-leds {
+			atmel,pins = <AT91_PIOD 17 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				      AT91_PIOD 19 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				      AT91_PIOD 21 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+		};
+	};
+
+	/* --- FIXME placeholder groups (SAM9X60 pins, used only by disabled
+	 * nodes). Replace every pin here with the schematic-correct SAM9X75
+	 * value before enabling the corresponding node. ---
+	 */
+	flexcom_fixme {
+		pinctrl_flx0_uart_fixme: flx0-uart-fixme {	/* Bluetooth - SAM9X60 PA30/PA31 */
+			atmel,pins = <AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE
+				      AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx3_uart_fixme: flx3-uart-fixme {	/* LTE - SAM9X60 PC22/PC23 */
+			atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE
+				      AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx5_spi_fixme: flx5-spi-fixme {	/* LCD/FPGA - SAM9X60 PA21/22/23 */
+			atmel,pins = <AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
+				      AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
+				      AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx9_uart_fixme: flx9-uart-fixme {	/* GPS - SAM9X60 PC8/PC9 */
+			atmel,pins = <AT91_PIOC 8 AT91_PERIPH_C AT91_PINCTRL_NONE
+				      AT91_PIOC 9 AT91_PERIPH_C AT91_PINCTRL_NONE>;
+		};
+	};
+
+	usb_fixme {
+		pinctrl_usb_default_fixme: usb-default-fixme {	/* SAM9X60 PA27 VBUS */
+			atmel,pins = <AT91_PIOA 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+		};
+	};
+}; /* pinctrl */
