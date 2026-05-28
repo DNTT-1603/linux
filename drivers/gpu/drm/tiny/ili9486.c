@@ -14,9 +14,10 @@
 
 #include <video/mipi_display.h>
 
+#include <drm/clients/drm_client_setup.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
-#include <drm/drm_fb_helper.h>
+#include <drm/drm_fbdev_dma.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_gem_dma_helper.h>
 #include <drm/drm_managed.h>
@@ -86,7 +87,6 @@ static int waveshare_command(struct mipi_dbi *mipi, u8 *cmd, u8 *par,
 
 		gpiod_set_value_cansleep(mipi->dc, 1);
 		ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, data, num);
-		free:
 		kfree(buf);
 
 		return ret;
@@ -235,10 +235,10 @@ static const struct drm_driver ili9486_driver = {
 	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
 	.fops			= &ili9486_fops,
 	DRM_GEM_DMA_DRIVER_OPS_VMAP,
+	DRM_FBDEV_DMA_DRIVER_OPS,
 	.debugfs_init		= mipi_dbi_debugfs_init,
 	.name			= "ili9486",
 	.desc			= "Ilitek ILI9486",
-	.date			= "20200118",
 	.major			= 1,
 	.minor			= 0,
 };
@@ -308,19 +308,17 @@ static int ili9486_probe(struct spi_device *spi)
 
 	spi_set_drvdata(spi, drm);
 
-	drm_fbdev_generic_setup(drm, 0);
+	drm_client_setup(drm, NULL);
 
 	return 0;
 }
 
-static int ili9486_remove(struct spi_device *spi)
+static void ili9486_remove(struct spi_device *spi)
 {
 	struct drm_device *drm = spi_get_drvdata(spi);
 
 	drm_dev_unplug(drm);
 	drm_atomic_helper_shutdown(drm);
-
-	return 0;
 }
 
 static void ili9486_shutdown(struct spi_device *spi)
