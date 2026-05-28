@@ -333,7 +333,7 @@
 		 *   PA13  GPIO                 LCD_DOUT  (unused - write-only panel)
 		 */
 		lcd: lcd@0 {
-			compatible = "sitronix,st7789v";
+			compatible = "waveshare,rpi-lcd-35";
 			reg = <0>;
 			buswidth = <8>;
 			rotation = <180>;
