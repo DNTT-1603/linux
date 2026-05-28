@@ -316,50 +316,27 @@
 	/* LCD (ST7789V) on CS0 + FPGA configuration on CS1 (FPGA still FIXME). */
 	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
 	status = "okay";
+};
 
-	spi5: spi@400 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx5_spi>;
+&spi5 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_flx5_spi>;
+	status = "okay";
+
+	lcd: lcd@0 {
+		compatible = "waveshare,rpi-lcd-35";
+		reg = <0>;
+		buswidth = <8>;
+		rotation = <180>;
+		spi-max-frequency = <50000000>;
+		write-only;
+		spi-cpol;
+		spi-cpha;
+		reset-gpios = <&pioA 18 GPIO_ACTIVE_LOW>;
+		dc-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
 		status = "okay";
-
-		/* LCD pin map (SAM9X75 SPRD schematic):
-		 *   PA16  FLEXCOM5_IO0  MOSI   LCD_DIN_SDA
-		 *   PA17  FLEXCOM5_IO2  SPCK   LCD_WR_SCL
-		 *   PA14  FLEXCOM5_IO3  NPCS0  LCD_CSX     -> reg = <0>
-		 *   PA15  GPIO                 LCD_RS_DCX
-		 *   PA18  GPIO                 LCD_RESX  (active-low)
-		 *   PA13  GPIO                 LCD_DOUT  (unused - write-only panel)
-		 */
-		lcd: lcd@0 {
-			compatible = "waveshare,rpi-lcd-35";
-			reg = <0>;
-			buswidth = <8>;
-			rotation = <180>;
-			spi-max-frequency = <50000000>;
-			write-only;
-			spi-cpol;
-			spi-cpha;
-			reset-gpios = <&pioA 18 GPIO_ACTIVE_LOW>;
-			dc-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
-			status = "okay";
-		};
-
-		/* FIXME(SPRD-9x75): FPGA configuration pins still SAM9X60 values -
-		 * supply the SAM9X75 schematic mapping (and the FLEXCOM5_IO4 = NPCS1
-		 * pin for CS1) before enabling.
-		 */
-		fpga_mgr_spi: fpga@1 {
-			compatible = "xlnx,fpga-slave-serial";
-			reg = <1>;
-			spi-max-frequency = <50000000>;
-			spi-cpha;
-			prog_b-gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
-			init-b-gpios = <&pioA 29 GPIO_ACTIVE_LOW>;
-			done-gpios = <&pioB 13 GPIO_ACTIVE_HIGH>;
-			status = "disabled";
-		};
 	};
 };
 
@@ -500,7 +477,8 @@
 		pinctrl_flx5_spi: flx5-spi {
 			atmel,pins = <AT91_PIOA 16 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO0 MOSI */
 				      AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO2 SPCK */
-				      AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM5_IO3 NPCS0 */
+				      AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO3 NPCS0 */
+				      AT91_PIOA 30 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM5_IO4 NPCS1 */
 		};
 
 		pinctrl_flx9_uart_fixme: flx9-uart-fixme {	/* GPS - SAM9X60 PC8/PC9 */
