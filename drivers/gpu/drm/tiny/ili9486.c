@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/gpio/driver.h>	/* DEBUG hardcode: gpio_device_find_by_fwnode / gpiochip_request_own_desc */
+#include <linux/gpio/machine.h>	/* DEBUG hardcode: enum gpio_lookup_flags, GPIO_ACTIVE_LOW/HIGH */
 #include <linux/of.h>		/* DEBUG hardcode: of_find_node_by_path / of_fwnode_handle */
 #include <linux/module.h>
 #include <linux/property.h>
