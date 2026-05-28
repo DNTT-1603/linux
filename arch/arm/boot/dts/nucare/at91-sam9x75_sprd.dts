@@ -40,7 +40,7 @@
 	/* stdout-path / chosen and memory (512 MB) come from sam9x75_som.dtsi.
 	 * FIXME(SPRD-9x75): confirm the SOM RAM size matches this board.
 	 */
-
+ 
 	keys: gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
@@ -216,14 +216,14 @@
 		i2c-analog-filter;
 		i2c-digital-filter;
 		i2c-digital-filter-width-ns = <35>;
-		status = "okay";
+		//FIXME: HH300 don't use batter driver, battery control by fpga.
+		status = "disabled";
 
 		fuel: fuel@55 {
 			compatible = "ti,bq27441";
 			reg = <0x55>;
 			monitored-battery = <&bat>;
 		};
-
 		bq24196: charger@6b {
 			compatible = "ti,bq24196";
 			reg = <0x6b>;
@@ -313,18 +313,25 @@
 };
 
 &flx5 {
-	/* LCD (ST7789V) + FPGA configuration SPI */
+	/* LCD (ST7789V) on CS0 + FPGA configuration on CS1 (FPGA still FIXME). */
 	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
-	status = "disabled"; /* FIXME(SPRD-9x75): set flx5 SPI pins, then enable */
+	status = "okay";
 
 	spi5: spi@400 {
 		#address-cells = <1>;
 		#size-cells = <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx5_spi_fixme>;
-		status = "disabled";
+		pinctrl-0 = <&pinctrl_flx5_spi>;
+		status = "okay";
 
-		/* FIXME(SPRD-9x75): all GPIOs below are SAM9X60 values. */
+		/* LCD pin map (SAM9X75 SPRD schematic):
+		 *   PA16  FLEXCOM5_IO0  MOSI   LCD_DIN_SDA
+		 *   PA17  FLEXCOM5_IO2  SPCK   LCD_WR_SCL
+		 *   PA14  FLEXCOM5_IO3  NPCS0  LCD_CSX     -> reg = <0>
+		 *   PA15  GPIO                 LCD_RS_DCX
+		 *   PA18  GPIO                 LCD_RESX  (active-low)
+		 *   PA13  GPIO                 LCD_DOUT  (unused - write-only panel)
+		 */
 		lcd: lcd@0 {
 			compatible = "sitronix,st7789v";
 			reg = <0>;
@@ -334,11 +341,15 @@
 			write-only;
 			spi-cpol;
 			spi-cpha;
-			reset-gpios = <&pioC 24 0>;
-			dc-gpios = <&pioA 24 0>;
-			status = "disabled";
+			reset-gpios = <&pioA 18 GPIO_ACTIVE_LOW>;
+			dc-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
+			status = "okay";
 		};
 
+		/* FIXME(SPRD-9x75): FPGA configuration pins still SAM9X60 values -
+		 * supply the SAM9X75 schematic mapping (and the FLEXCOM5_IO4 = NPCS1
+		 * pin for CS1) before enabling.
+		 */
 		fpga_mgr_spi: fpga@1 {
 			compatible = "xlnx,fpga-slave-serial";
 			reg = <1>;
@@ -481,10 +492,15 @@
 				      AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
 		};
 
-		pinctrl_flx5_spi_fixme: flx5-spi-fixme {	/* LCD/FPGA - SAM9X60 PA21/22/23 */
-			atmel,pins = <AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
-				      AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE
-				      AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+		/* FLEXCOM5 SPI on SAM9X75 SPRD - PA14/16/17.
+		 * VERIFY peripheral letter (B vs C) against the SAM9X75 datasheet
+		 * PIO multiplexing table. Both columns are legal per mux-mask;
+		 * defaulting to B by analogy with the SAM9X60 flx5 SPI placement.
+		 */
+		pinctrl_flx5_spi: flx5-spi {
+			atmel,pins = <AT91_PIOA 16 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO0 MOSI */
+				      AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO2 SPCK */
+				      AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM5_IO3 NPCS0 */
 		};
 
 		pinctrl_flx9_uart_fixme: flx9-uart-fixme {	/* GPS - SAM9X60 PC8/PC9 */
