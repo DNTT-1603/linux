@@ -9,7 +9,7 @@ static const struct regmap_config mmc5983_regmap_config = {
     .val_bits = 8,
 };
 
-static int mmc5983_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int mmc5983_i2c_probe(struct i2c_client *client)
 {
     struct regmap *regmap;
 
@@ -19,9 +19,9 @@ static int mmc5983_i2c_probe(struct i2c_client *client, const struct i2c_device_
 
     return mmc5983_common_probe(&client->dev, regmap, client->name);
 }
-static int mmc5983_i2c_remove(struct i2c_client *client)
+static void mmc5983_i2c_remove(struct i2c_client *client)
 {
-	return mmc5983_common_remove(&client->dev);
+	mmc5983_common_remove(&client->dev);
 }
 
 static const struct of_device_id mmc5983_of_match[] = {
