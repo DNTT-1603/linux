@@ -8,6 +8,9 @@
 #include <linux/backlight.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/gpio/driver.h>	/* DEBUG hardcode: gpio_device_find_by_fwnode / gpiochip_request_own_desc */
+#include <linux/gpio/machine.h>	/* DEBUG hardcode: enum gpio_lookup_flags, GPIO_ACTIVE_LOW/HIGH */
+#include <linux/of.h>		/* DEBUG hardcode: of_find_node_by_path / of_fwnode_handle */
 #include <linux/module.h>
 #include <linux/property.h>
 #include <linux/spi/spi.h>
@@ -180,7 +183,7 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 
 	mipi_dbi_command(dbi, ILI9486_PWCTRL1, 0x44);
 
-	mipi_dbi_command(dbi, ILI9486_VMCTRL1, 0x00, 0x00, 0x00, 0x00);
+	mipi_dbi_command(dbi, ILI9486_VMCTRL1, 0x00, 0x23, 0x00, 0x23);
 
 	// mipi_dbi_command(dbi, ILI9486_PGAMCTRL,
 	// 		 0x0F, 0x1F, 0x1C, 0x0C, 0x0F, 0x08, 0x48, 0x98,
@@ -220,9 +223,7 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 }
 
 static const struct drm_simple_display_pipe_funcs waveshare_pipe_funcs = {
-	.enable = waveshare_enable,
-	.disable = mipi_dbi_pipe_disable,
-	.update = mipi_dbi_pipe_update,
+	DRM_MIPI_DBI_SIMPLE_DISPLAY_PIPE_FUNCS(waveshare_enable),
 };
 
 static const struct drm_display_mode waveshare_mode = {
@@ -258,6 +259,62 @@ static const struct spi_device_id ili9486_id[] = {
 };
 MODULE_DEVICE_TABLE(spi, ili9486_id);
 
+/*
+ * DEBUG HARDCODE (Nucare SPRD SAM9X75, temporary)
+ * ------------------------------------------------
+ * The runtime DT on this board is corrupted (FDT relocation collision),
+ * so devm_gpiod_get(dev, "reset"/"dc", ...) fails with -ENOENT even though
+ * reset-gpios / dc-gpios are present in the .dts source.
+ *
+ * This helper bypasses the DT lookup: it finds the pioA gpiochip by its
+ * device-tree node path and requests a hardcoded line number on it. The
+ * board mapping baked in below is:
+ *
+ *     reset  =  pioA pin 18  (active-low)   LCD_RESX
+ *     dc     =  pioA pin 15  (active-high)  LCD_RS_DCX
+ *
+ * REVERT THIS once the FDT collision is fixed (set fdt_high=0xffffffff in
+ * U-Boot env, or move fdt_addr_r out of the kernel's decompress range).
+ */
+static struct gpio_desc *ili9486_dbg_request_pioA(struct device *dev,
+						  unsigned int line,
+						  const char *label,
+						  enum gpio_lookup_flags lflags,
+						  enum gpiod_flags dflags)
+{
+	struct device_node *np;
+	struct gpio_device *gdev;
+	struct gpio_chip *gc;
+	struct gpio_desc *desc;
+
+	np = of_find_node_by_path("/apb/pinctrl@fffff400/gpio@fffff400");
+	if (!np) {
+		dev_err(dev, "DEBUG: pioA node not found\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	gdev = gpio_device_find_by_fwnode(of_fwnode_handle(np));
+	of_node_put(np);
+	if (!gdev) {
+		dev_warn(dev, "DEBUG: pioA gpio_device not ready, deferring\n");
+		return ERR_PTR(-EPROBE_DEFER);
+	}
+
+	gc = gpio_device_get_chip(gdev);
+	if (!gc) {
+		gpio_device_put(gdev);
+		dev_err(dev, "DEBUG: pioA gpio_chip is NULL\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	desc = gpiochip_request_own_desc(gc, line, label, lflags, dflags);
+	gpio_device_put(gdev);
+	if (IS_ERR(desc))
+		dev_err(dev, "DEBUG: gpiochip_request_own_desc(pioA[%u]) failed: %ld\n",
+			line, PTR_ERR(desc));
+	return desc;
+}
+
 static int ili9486_probe(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
@@ -276,13 +333,29 @@ static int ili9486_probe(struct spi_device *spi)
 	dbi = &dbidev->dbi;
 	drm = &dbidev->drm;
 
-	dbi->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	/* === DEBUG HARDCODE BEGIN: bypass DT, force PA18/PA15 === */
+	dbi->reset = ili9486_dbg_request_pioA(dev, 18, "lcd-reset",
+					      GPIO_ACTIVE_HIGH, GPIOD_OUT_HIGH);
 	if (IS_ERR(dbi->reset))
-		return dev_err_probe(dev, PTR_ERR(dbi->reset), "Failed to get GPIO 'reset'\n");
+		return dev_err_probe(dev, PTR_ERR(dbi->reset),
+				     "DEBUG: hardcoded reset gpio failed\n");
 
-	dc = devm_gpiod_get(dev, "dc", GPIOD_OUT_LOW);
+	dc = ili9486_dbg_request_pioA(dev, 15, "lcd-dc",
+				      GPIO_ACTIVE_HIGH, GPIOD_OUT_LOW);
 	if (IS_ERR(dc))
-		return dev_err_probe(dev, PTR_ERR(dc), "Failed to get GPIO 'dc'\n");
+		return dev_err_probe(dev, PTR_ERR(dc),
+				     "DEBUG: hardcoded dc gpio failed\n");
+	/* === DEBUG HARDCODE END ===
+	 * Original DT-based lookups (restore when FDT is fixed):
+	 *   dbi->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	 *   if (IS_ERR(dbi->reset))
+	 *           return dev_err_probe(dev, PTR_ERR(dbi->reset),
+	 *                                "Failed to get GPIO 'reset'\n");
+	 *   dc = devm_gpiod_get(dev, "dc", GPIOD_OUT_LOW);
+	 *   if (IS_ERR(dc))
+	 *           return dev_err_probe(dev, PTR_ERR(dc),
+	 *                                "Failed to get GPIO 'dc'\n");
+	 */
 
 	dbidev->backlight = devm_of_find_backlight(dev);
 	if (IS_ERR(dbidev->backlight))
