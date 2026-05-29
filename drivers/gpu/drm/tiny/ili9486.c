@@ -183,7 +183,7 @@ static void waveshare_enable(struct drm_simple_display_pipe *pipe,
 
 	mipi_dbi_command(dbi, ILI9486_PWCTRL1, 0x44);
 
-	mipi_dbi_command(dbi, ILI9486_VMCTRL1, 0x00, 0x00, 0x00, 0x00);
+	mipi_dbi_command(dbi, ILI9486_VMCTRL1, 0x00, 0x23, 0x00, 0x23);
 
 	// mipi_dbi_command(dbi, ILI9486_PGAMCTRL,
 	// 		 0x0F, 0x1F, 0x1C, 0x0C, 0x0F, 0x08, 0x48, 0x98,
@@ -335,7 +335,7 @@ static int ili9486_probe(struct spi_device *spi)
 
 	/* === DEBUG HARDCODE BEGIN: bypass DT, force PA18/PA15 === */
 	dbi->reset = ili9486_dbg_request_pioA(dev, 18, "lcd-reset",
-					      GPIO_ACTIVE_LOW, GPIOD_OUT_HIGH);
+					      GPIO_ACTIVE_HIGH, GPIOD_OUT_HIGH);
 	if (IS_ERR(dbi->reset))
 		return dev_err_probe(dev, PTR_ERR(dbi->reset),
 				     "DEBUG: hardcoded reset gpio failed\n");
