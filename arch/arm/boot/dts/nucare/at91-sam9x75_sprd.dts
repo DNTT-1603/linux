@@ -31,7 +31,7 @@
 		/* i2c0 = &i2c6 (PMIC) comes from sam9x75_som.dtsi */
 		i2c1 = &i2c7;		/* EEPROM */
 		i2c2 = &i2c10;		/* Battery / charger */
-		serial1 = &uart0;	/* Bluetooth - FIXME pins */
+		serial1 = &uart0;	/* Bluetooth, skip it,don't use ble */
 		serial2 = &uart1;	/* FPGA */
 		serial3 = &uart9;	/* GPS - FIXME pins */
 		serial4 = &uart3;	/* LTE - FIXME pins */
@@ -323,14 +323,28 @@
 };
 
 &flx0 {
-	/* Bluetooth UART. Relocated off flx6 (now the PMIC TWI on the SOM). */
-	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
-	status = "disabled"; /* FIXME(SPRD-9x75): set flx0 USART pins, then enable */
+	/* Magnetometer I2C bus on PA30/PA31 (repurposed from the unused
+	 * Bluetooth UART - BLE is handled by the WILC3000, not flx0).
+	 */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
+	status = "okay";
 
-	uart0: serial@200 {
+	i2c0: i2c@600 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		dmas = <0>, <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx0_uart_fixme>;
-		status = "disabled";
+		pinctrl-0 = <&pinctrl_flx0_i2c>;
+		i2c-analog-filter;
+		i2c-digital-filter;
+		i2c-digital-filter-width-ns = <35>;
+		status = "okay";
+
+		mmc@30 {
+			compatible = "memsic,mmc5983";
+			reg = <0x30>;
+			status = "okay";
+		};
 	};
 };
 
@@ -429,6 +443,12 @@
 	};
 
 	flexcom {
+		/* FLEXCOM0 TWI: PA30 = TWD (IO0), PA31 = TWCK (IO1) */
+		pinctrl_flx0_i2c: flx0-i2c {
+			atmel,pins = <AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
+				      AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
+		};
+
 		pinctrl_flx1_default: flx1-default {
 			atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE
 				      AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
@@ -520,11 +540,6 @@
 	 * value before enabling the corresponding node. ---
 	 */
 	flexcom_fixme {
-		pinctrl_flx0_uart_fixme: flx0-uart-fixme {	/* Bluetooth - SAM9X60 PA30/PA31 */
-			atmel,pins = <AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE
-				      AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-		};
-
 		pinctrl_flx3_uart_fixme: flx3-uart-fixme {	/* LTE - SAM9X60 PC22/PC23 */
 			atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE
 				      AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
@@ -536,10 +551,10 @@
 		 * defaulting to B by analogy with the SAM9X60 flx5 SPI placement.
 		 */
 		pinctrl_flx5_spi: flx5-spi {
+			/* PA30 (NPCS1) dropped: now used by flx0 TWI (TWD). LCD is on CS0. */
 			atmel,pins = <AT91_PIOA 16 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO0 MOSI */
 				      AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO2 SPCK */
-				      AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM5_IO3 NPCS0 */
-				      AT91_PIOA 30 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM5_IO4 NPCS1 */
+				      AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM5_IO3 NPCS0 */
 		};
 
 		pinctrl_flx9_uart_fixme: flx9-uart-fixme {	/* GPS - SAM9X60 PC8/PC9 */

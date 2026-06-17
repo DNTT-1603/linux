@@ -48,6 +48,6 @@ static struct i2c_driver mmc5983_driver = {
 
 module_i2c_driver(mmc5983_driver);
 
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Tu Do <dongocthanhtuwork@gmail.com>");
 MODULE_DESCRIPTION("MMC5983 IIO I2C driver");
 MODULE_LICENSE("GPL");

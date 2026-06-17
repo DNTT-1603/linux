@@ -262,6 +262,6 @@ int mmc5983_common_remove(struct device *dev)
 }
 EXPORT_SYMBOL(mmc5983_common_remove);
 
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("Tu Do <dongocthanhtuwork@gmail.com>");
 MODULE_DESCRIPTION("MMC5983 IIO Core Driver");
 MODULE_LICENSE("GPL");
