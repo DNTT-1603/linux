@@ -143,6 +143,17 @@
 		sdmode-delay = <5>;
 		status = "okay";
 	};
+
+	/* ATWILC3000 WiFi/BT combo on SDMMC1 (SDIO). Two-stage power-up
+	 * (CHIP_EN then RESETN) handled by the mmc-pwrseq-wilc1000 driver.
+	 */
+	wifi_pwrseq: wifi-pwrseq {
+		compatible = "mmc-pwrseq-wilc1000";
+		reset-gpios = <&pioA 21 GPIO_ACTIVE_HIGH>;	/* WIFI_Rst    */
+		powerdown-gpios = <&pioA 19 GPIO_ACTIVE_HIGH>;	/* WIFI_EN_MPU */
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_wilc_pwrseq_default>;
+	};
 };
 
 /* ===== Verified peripherals (SAM9X75 pins confirmed) ===== */
@@ -260,6 +271,29 @@
 	 * cd-gpios = <&pioX YY GPIO_ACTIVE_LOW>;
 	 */
 	status = "okay";
+};
+
+&sdmmc1 {
+	/* ATWILC3000 WiFi over SDIO (4-bit). Soldered module: non-removable,
+	 * 3.3V-only signaling (no-1-8-v), powered/reset via &wifi_pwrseq.
+	 */
+	bus-width = <4>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdmmc1_default>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	mmc-pwrseq = <&wifi_pwrseq>;
+	status = "okay";
+
+	wilc: wifi@0 {
+		compatible = "microchip,wilc1000", "microchip,wilc3000";
+		reg = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_wilc_default>;
+		interrupt-parent = <&pioA>;
+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;	/* WIFI_INT PA20 */
+		status = "okay";
+	};
 };
 
 &tcb {
@@ -431,6 +465,33 @@
 				<AT91_PIOA 3 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT1 */
 				<AT91_PIOA 4 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT2 */
 				<AT91_PIOA 5 AT91_PERIPH_A (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>;	/* DAT3 */
+		};
+	};
+
+	sdmmc1 {
+		/* SAM9X75 SDMMC1 = PA6..PA11 periph B (verified vs at91-sam9x75_curiosity.dts) */
+		pinctrl_sdmmc1_default: sdmmc1-default {
+			atmel,pins =
+				<AT91_PIOA 11 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* CK   */
+				<AT91_PIOA 10 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* CMD  */
+				<AT91_PIOA 9 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT0 */
+				<AT91_PIOA 6 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT1 */
+				<AT91_PIOA 7 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>,	/* DAT2 */
+				<AT91_PIOA 8 AT91_PERIPH_B (AT91_PINCTRL_DRIVE_STRENGTH_HI | AT91_PINCTRL_SLEWRATE_ENA)>;	/* DAT3 */
+		};
+	};
+
+	wilc {
+		/* WIFI_INT (PA20): active-low open-drain IRQ -> pull up to idle high. */
+		pinctrl_wilc_default: wilc-default {
+			atmel,pins = <AT91_PIOA 20 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
+		};
+	};
+
+	wilc_pwrseq {
+		pinctrl_wilc_pwrseq_default: wilc-pwrseq-default {
+			atmel,pins = <AT91_PIOA 19 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_DOWN	/* WIFI_EN_MPU */
+				      AT91_PIOA 21 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_DOWN>;	/* WIFI_Rst    */
 		};
 	};
 
