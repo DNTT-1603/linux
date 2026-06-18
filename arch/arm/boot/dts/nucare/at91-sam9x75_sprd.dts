@@ -367,6 +367,22 @@
 		dc-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
+
+	/* Xilinx slave-serial FPGA config loader (driver: xilinx-fw-update-spi).
+	 * FIXME(SPRD-9x75): reg = <1> selects NPCS1, but PA30/NPCS1 is now used
+	 * by flx0 TWI. Before enabling, add a cs-gpios entry for CS1 on spi5 (or
+	 * free NPCS1). prog_b/init-b/done on PC24/PC25/PC26 - verify vs schematic.
+	 */
+	fpga: fpga@1 {
+		compatible = "xlnx,fpga-slave-serial";
+		reg = <1>;
+		spi-max-frequency = <50000000>;
+		spi-cpha;
+		prog_b-gpios = <&pioC 24 GPIO_ACTIVE_LOW>;
+		init-b-gpios = <&pioC 25 GPIO_ACTIVE_LOW>;
+		done-gpios   = <&pioC 26 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
+	};
 };
 
 &flx9 {
