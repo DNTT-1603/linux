@@ -215,42 +215,16 @@
 };
 
 &flx10 {
-	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
+	/* FLEXCOM10 UART (repurposed from the unused battery/charger TWI -
+	 * on HH300 the battery is managed by the FPGA, not this bus).
+	 */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
 	status = "okay";
 
-	i2c10: i2c@600 {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		dmas = <0>, <0>;
+	uart10: serial@200 {
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx10_default>;
-		i2c-analog-filter;
-		i2c-digital-filter;
-		i2c-digital-filter-width-ns = <35>;
-		//FIXME: HH300 don't use batter driver, battery control by fpga.
-		status = "disabled";
-
-		fuel: fuel@55 {
-			compatible = "ti,bq27441";
-			reg = <0x55>;
-			monitored-battery = <&bat>;
-		};
-		bq24196: charger@6b {
-			compatible = "ti,bq24196";
-			reg = <0x6b>;
-			/* FIXME(SPRD-9x75): charger IRQ. The SAM9X60 design used
-			 * pioA 1, which is the sdmmc0 CMD line on SAM9X75 - it
-			 * cannot be reused. Provide a free SAM9X75 GPIO and
-			 * re-enable the two properties below.
-			 * interrupt-parent = <&pioA>;
-			 * interrupts = <1 IRQ_TYPE_EDGE_FALLING 1>;
-			 */
-			ti,system-minimum-microvolt = <3200000>;
-			monitored-battery = <&bat>;
-			omit-battery-class;
-
-			usb_otg_vbus: usb-otg-vbus { };
-		};
+		pinctrl-0 = <&pinctrl_flx10_uart>;
+		status = "okay";
 	};
 };
 
@@ -468,9 +442,9 @@
 				      AT91_PIOC 1 AT91_PERIPH_C AT91_PINCTRL_PULL_UP>;
 		};
 
-		pinctrl_flx10_default: flx10-default {
-			atmel,pins = <AT91_PIOC 16 AT91_PERIPH_C AT91_PINCTRL_PULL_UP
-				      AT91_PIOC 17 AT91_PERIPH_C AT91_PINCTRL_PULL_UP>;
+		pinctrl_flx10_uart: flx10-uart {	/* FLEXCOM10 USART: PC16/PC17 */
+			atmel,pins = <AT91_PIOC 16 AT91_PERIPH_C AT91_PINCTRL_NONE
+				      AT91_PIOC 17 AT91_PERIPH_C AT91_PINCTRL_NONE>;
 		};
 	};
 
