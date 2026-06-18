@@ -23,6 +23,7 @@
 #include <linux/usb/gadget.h>
 #include <linux/delay.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/irq.h>
 #include <linux/gpio/consumer.h>
 
@@ -1947,6 +1948,19 @@ static irqreturn_t usba_vbus_irq_thread(int irq, void *devid)
 	/* debounce */
 	udelay(10);
 
+	/*
+	 * OTG: when the ID pin is grounded (raw 0) a host cable is attached,
+	 * so keep the device controller detached and let OHCI/EHCI own the
+	 * port. Only run as a USB device when ID is float (raw 1).
+	 */
+	if (udc->id_pin && !gpiod_get_value(udc->id_pin)) {
+		udc->id_prev = 0;
+		usba_writel(udc, CTRL, USBA_DISABLE_MASK);
+		return IRQ_HANDLED;
+	}
+	if (udc->id_pin)
+		udc->id_prev = 1;
+
 	mutex_lock(&udc->vbus_mutex);
 
 	vbus = vbus_is_present(udc);
@@ -2011,8 +2025,12 @@ static int atmel_usba_start(struct usb_gadget *gadget,
 	if (udc->vbus_pin)
 		enable_irq(gpiod_to_irq(udc->vbus_pin));
 
-	/* If Vbus is present, enable the controller and wait for reset */
-	udc->vbus_prev = vbus_is_present(udc);
+	/*
+	 * If Vbus is present AND no host cable is attached (ID float, raw 1),
+	 * enable the device controller and wait for reset.
+	 */
+	udc->vbus_prev = vbus_is_present(udc) &&
+			 (!udc->id_pin || gpiod_get_value(udc->id_pin));
 	if (udc->vbus_prev) {
 		phy_set_mode_ext(udc->phy, PHY_MODE_USB_DEVICE, 1);
 		ret = usba_start(udc);
@@ -2177,6 +2195,7 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
 	const struct of_device_id *match;
 	struct device_node *pp;
 	int i, ret;
+	int vbus_pin, id_pin;
 	struct usba_ep *eps, *ep;
 	const struct usba_udc_config *udc_config;
 
@@ -2203,10 +2222,21 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
 
 	udc->num_ep = 0;
 
-	udc->vbus_pin = devm_gpiod_get_optional(&pdev->dev, "atmel,vbus",
-						GPIOD_IN);
-	if (IS_ERR(udc->vbus_pin))
-		return ERR_CAST(udc->vbus_pin);
+	/*
+	 * OTG: the VBUS-enable and ID lines are shared with the OHCI host
+	 * driver, so use non-claiming descriptors (gpio_to_desc) instead of
+	 * devm_gpiod_get(), which would fail with -EBUSY once OHCI requests
+	 * the same pins. Values are read raw - the DT polarity flags are not
+	 * applied to gpio_to_desc() descriptors:
+	 *   ID:   raw 0 = host cable grounded, raw 1 = device / float
+	 *   VBUS: raw 1 = 5V sourced (host mode)
+	 */
+	vbus_pin = of_get_named_gpio(np, "atmel,vbus-gpio", 0);
+	udc->vbus_pin = gpio_is_valid(vbus_pin) ? gpio_to_desc(vbus_pin) : NULL;
+
+	id_pin = of_get_named_gpio(np, "atmel,id-gpio", 0);
+	udc->id_pin = gpio_is_valid(id_pin) ? gpio_to_desc(id_pin) : NULL;
+	udc->id_prev = udc->id_pin ? gpiod_get_value(udc->id_pin) : 1;
 
 	if (fifo_mode == 0) {
 		udc->num_ep = udc_config->num_ep;

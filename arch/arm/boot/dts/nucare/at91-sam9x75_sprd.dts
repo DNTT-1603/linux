@@ -408,17 +408,26 @@
 	status = "disabled";
 };
 
-&ohci0 {
-	num-ports = <1>;
+&usb0 {
+	/* VBUS (PC6) and ID (PC21) are read-only here: the UDC senses VBUS
+	 * state and the cable role. Actual VBUS power is switched by the HH300
+	 * STM32 MCU - the kernel never drives it.
+	 */
+	atmel,vbus-gpio = <&pioC 6 GPIO_ACTIVE_HIGH>;
+	atmel,id-gpio = <&pioC 21 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usb_default_fixme>;
-	status = "disabled"; /* FIXME(SPRD-9x75): set VBUS GPIO(s), then enable */
+	pinctrl-0 = <&pinctrl_usb_otg>;
+	status = "okay";
 };
 
-&usb0 {
-	/* USB device / OTG */
-	status = "disabled"; /* FIXME(SPRD-9x75): set VBUS/ID GPIOs, then enable */
+&ohci0 {
+	/* No VBUS/ID GPIOs: VBUS is controlled externally by the STM32 MCU,
+	 * not by the host controller.
+	 */
+	num-ports = <1>;
+	status = "okay";
 };
+
 
 &pinctrl {
 	/* --- Verified SAM9X75 pin groups --- */
@@ -563,9 +572,14 @@
 		};
 	};
 
-	usb_fixme {
-		pinctrl_usb_default_fixme: usb-default-fixme {	/* SAM9X60 PA27 VBUS */
-			atmel,pins = <AT91_PIOA 27 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+	usb {
+		/* OTG sense pins for the UDC - the kernel does NOT drive VBUS
+		 * (the HH300 STM32 MCU does). PC6 = VBUS state input (driven by
+		 * the STM32), PC21 = ID input (pulled up: floating ID = device).
+		 */
+		pinctrl_usb_otg: usb-otg {
+			atmel,pins = <AT91_PIOC 6 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+				      AT91_PIOC 21 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
 		};
 	};
 }; /* pinctrl */

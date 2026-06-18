@@ -341,6 +341,8 @@ struct usba_udc {
 	const struct usba_udc_errata *errata;
 	int irq;
 	struct gpio_desc *vbus_pin;
+	struct gpio_desc *id_pin;	/* OTG ID; read raw: 0 = host cable, 1 = device/float */
+	int id_prev;
 	int num_ep;
 	struct usba_fifo_cfg *fifo_cfg;
 	struct clk *pclk;
