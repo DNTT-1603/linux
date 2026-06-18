@@ -154,6 +154,13 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_wilc_pwrseq_default>;
 	};
+
+	vibrator: vibrator {
+		compatible = "gpio-vibrator";
+		enable-gpios = <&pioA 22 GPIO_ACTIVE_HIGH>;	/* PA22 (free GPIO) */
+		vcc-supply = <&vdd_3v3>;
+		status = "okay";
+	};
 };
 
 /* ===== Verified peripherals (SAM9X75 pins confirmed) ===== */
@@ -456,6 +463,7 @@
 				 AT91_PIOB 16 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SDIN */
 				 AT91_PIOB 17 AT91_PERIPH_D AT91_PINCTRL_NONE		/* I2SDOUT */
 				 AT91_PIOB 25 AT91_PERIPH_D AT91_PINCTRL_NONE>;		/* I2SMCK */
+				 AT91_PIOC 31 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP		// Audio_EN
 		};
 	};
 
