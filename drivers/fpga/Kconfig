@@ -290,4 +290,14 @@ config FPGA_MGR_LATTICE_SYSCONFIG_SPI
 
 source "drivers/fpga/tests/Kconfig"
 
+config FPGA_XILINX_FW_UPDATE_SPI
+        tristate "Xilinx SPI bare-metal FW loader"
+        depends on SPI && FW_LOADER && OF
+        help
+          Simple test-only helper that directly toggles GPIOs (PROGRAM_B,
+          INIT_B, DONE) and streams a bitstream over the SPI core without
+          using the FPGA manager. It exposes a sysfs trigger at
+          /sys/class/fpga_loader/loader0/firmware (echo start > ...), which
+          loads /lib/firmware/xilinx-fpga-fw.bin by default. Use only for bring-up.
+
 endif # FPGA

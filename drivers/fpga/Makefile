@@ -60,3 +60,7 @@ obj-$(CONFIG_FPGA_DFL_PCI)		+= dfl-pci.o
 
 # KUnit tests
 obj-$(CONFIG_FPGA_KUNIT_TESTS)		+= tests/
+
+#FPGA Manager Drivers which support DFL
+obj-$(CONFIG_FPGA_XILINX_FW_UPDATE_SPI)      += xilinx-fw-update-spi.o
+
