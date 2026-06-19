@@ -421,7 +421,7 @@
 	/* No VBUS/ID GPIOs: VBUS is controlled externally by the STM32 MCU,
 	 * not by the host controller.
 	 */
-	num-ports = <1>;
+	num-ports = <3>;
 	status = "okay";
 };
 
