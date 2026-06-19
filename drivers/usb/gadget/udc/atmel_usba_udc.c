@@ -1948,6 +1948,13 @@ static irqreturn_t usba_vbus_irq_thread(int irq, void *devid)
 	/* debounce */
 	udelay(10);
 
+	/* DEBUG(OTG): log pin state on every VBUS/ID edge */
+	dev_info(&udc->pdev->dev,
+		 "OTG irq: vbus(raw)=%d id(raw)=%d vbus_prev=%d id_prev=%d\n",
+		 udc->vbus_pin ? gpiod_get_value(udc->vbus_pin) : -1,
+		 udc->id_pin ? gpiod_get_value(udc->id_pin) : -1,
+		 udc->vbus_prev, udc->id_prev);
+
 	/*
 	 * OTG: when the ID pin is grounded (raw 0) a host cable is attached,
 	 * so keep the device controller detached and let OHCI/EHCI own the
@@ -2031,6 +2038,12 @@ static int atmel_usba_start(struct usb_gadget *gadget,
 	 */
 	udc->vbus_prev = vbus_is_present(udc) &&
 			 (!udc->id_pin || gpiod_get_value(udc->id_pin));
+	/* DEBUG(OTG): pin state at gadget bind */
+	dev_info(&udc->pdev->dev,
+		 "OTG start: vbus(raw)=%d id(raw)=%d -> %s\n",
+		 udc->vbus_pin ? gpiod_get_value(udc->vbus_pin) : -1,
+		 udc->id_pin ? gpiod_get_value(udc->id_pin) : -1,
+		 udc->vbus_prev ? "start device" : "stay idle");
 	if (udc->vbus_prev) {
 		phy_set_mode_ext(udc->phy, PHY_MODE_USB_DEVICE, 1);
 		ret = usba_start(udc);
@@ -2237,6 +2250,12 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
 	id_pin = of_get_named_gpio(np, "atmel,id-gpio", 0);
 	udc->id_pin = gpio_is_valid(id_pin) ? gpio_to_desc(id_pin) : NULL;
 	udc->id_prev = udc->id_pin ? gpiod_get_value(udc->id_pin) : 1;
+
+	/* DEBUG(OTG): resolved GPIOs and their initial raw levels */
+	dev_info(&pdev->dev,
+		 "OTG debug: vbus-gpio=%d (raw=%d), id-gpio=%d (raw=%d)\n",
+		 vbus_pin, udc->vbus_pin ? gpiod_get_value(udc->vbus_pin) : -1,
+		 id_pin, udc->id_pin ? gpiod_get_value(udc->id_pin) : -1);
 
 	if (fifo_mode == 0) {
 		udc->num_ep = udc_config->num_ep;
