@@ -34,7 +34,6 @@
 		serial1 = &uart0;	/* Bluetooth, skip it,don't use ble */
 		serial2 = &uart1;	/* FPGA */
 		serial3 = &uart9;	/* GPS - FIXME pins */
-		serial4 = &uart3;	/* LTE - FIXME pins */
 	};
 
 	/* stdout-path / chosen and memory (512 MB) come from sam9x75_som.dtsi.
@@ -330,19 +329,30 @@
 };
 
 &flx3 {
-	/* LTE modem UART */
-	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
-	status = "disabled"; /* FIXME(SPRD-9x75): set flx3 USART pins, then enable */
+	/* FPGA configuration over SPI (slave-serial) */
+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
+	status = "okay";
+};
 
-	uart3: serial@200 {
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_flx3_uart_fixme>;
-		status = "disabled";
+&spi3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_flx3_spi>;
+	status = "okay";
+
+	fpga: fpga@0 {
+		compatible = "xlnx,fpga-slave-serial";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+		spi-cpha;
+		prog_b-gpios = <&pioC 4 GPIO_ACTIVE_LOW>;
+		init-b-gpios = <&pioC 3 GPIO_ACTIVE_LOW>;
+		done-gpios   = <&pioC 2 GPIO_ACTIVE_HIGH>;
+		status = "okay";
 	};
 };
 
 &flx5 {
-	/* LCD (ST7789V) on CS0 + FPGA configuration on CS1 (FPGA still FIXME). */
+	/* LCD (ST7789V) on CS0. */
 	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
 	status = "okay";
 };
@@ -366,22 +376,6 @@
 		reset-gpios = <&pioA 18 GPIO_ACTIVE_LOW>;
 		dc-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
 		status = "okay";
-	};
-
-	/* Xilinx slave-serial FPGA config loader (driver: xilinx-fw-update-spi).
-	 * FIXME(SPRD-9x75): reg = <1> selects NPCS1, but PA30/NPCS1 is now used
-	 * by flx0 TWI. Before enabling, add a cs-gpios entry for CS1 on spi5 (or
-	 * free NPCS1). prog_b/init-b/done on PC24/PC25/PC26 - verify vs schematic.
-	 */
-	fpga: fpga@1 {
-		compatible = "xlnx,fpga-slave-serial";
-		reg = <1>;
-		spi-max-frequency = <50000000>;
-		spi-cpha;
-		prog_b-gpios = <&pioC 24 GPIO_ACTIVE_LOW>;
-		init-b-gpios = <&pioC 25 GPIO_ACTIVE_LOW>;
-		done-gpios   = <&pioC 26 GPIO_ACTIVE_HIGH>;
-		status = "disabled";
 	};
 };
 
@@ -458,6 +452,12 @@
 		pinctrl_flx1_default: flx1-default {
 			atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE
 				      AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+		};
+
+		pinctrl_flx3_spi: flx3-spi {
+			atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM3_IO0 MOSI */
+				      AT91_PIOC 26 AT91_PERIPH_B AT91_PINCTRL_NONE   /* FLEXCOM3_IO2 SPCK */
+				      AT91_PIOC 25 AT91_PERIPH_B AT91_PINCTRL_NONE>; /* FLEXCOM3_IO3 NPCS0 */
 		};
 
 		pinctrl_flx7_default: flx7-default {
@@ -547,11 +547,6 @@
 	 * value before enabling the corresponding node. ---
 	 */
 	flexcom_fixme {
-		pinctrl_flx3_uart_fixme: flx3-uart-fixme {	/* LTE - SAM9X60 PC22/PC23 */
-			atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE
-				      AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-		};
-
 		/* FLEXCOM5 SPI on SAM9X75 SPRD - PA14/16/17.
 		 * VERIFY peripheral letter (B vs C) against the SAM9X75 datasheet
 		 * PIO multiplexing table. Both columns are legal per mux-mask;
