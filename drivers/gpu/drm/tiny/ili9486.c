@@ -13,6 +13,7 @@
 #include <linux/of.h>		/* DEBUG hardcode: of_find_node_by_path / of_fwnode_handle */
 #include <linux/module.h>
 #include <linux/property.h>
+#include <linux/sizes.h>
 #include <linux/spi/spi.h>
 
 #include <video/mipi_display.h>
@@ -46,113 +47,70 @@
 static int waveshare_command(struct mipi_dbi *mipi, u8 *cmd, u8 *par,
 			     size_t num)
 {
-	if (*cmd == 0x2C) {
-		struct spi_device *spi = mipi->spi;
-		void *data = par;
-		u32 speed_hz;
-		int i, ret;
-		u8 *buf;
+	struct spi_device *spi = mipi->spi;
+	u32 speed_hz;
+	int ret;
 
+	spi_bus_lock(spi->controller);
 
+	gpiod_set_value_cansleep(mipi->dc, 0);
+	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 1);
+	ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, cmd, 1);
+	if (ret || !num)
+		goto out_unlock;
+
+	if (*cmd == MIPI_DCS_WRITE_MEMORY_START) {
 		/*
-		* The displays are Raspberry Pi HATs and connected to the 8-bit only
-		* SPI controller, so 16-bit command and parameters need byte swapping
-		* before being transferred as 8-bit on the big endian SPI bus.
-		* Pixel data bytes have already been swapped before this function is
-		* called.
-		*/
-		// buf[0] = cpu_to_be16(*cmd);
-		gpiod_set_value_cansleep(mipi->dc, 0);
-		speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 1);
-		ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, cmd, 1);
+		 * RGB565 -> 18-bit (3 bytes/pixel, inverted) conversion for
+		 * the panel's parallel bus converter. Convert and transfer in
+		 * fixed-size chunks through mipi->tx_buf9 (unused by this
+		 * bus type otherwise) instead of kmalloc'ing a buffer sized
+		 * for the whole transfer: a full-frame update needs up to
+		 * ~450KB, and repeating a contiguous allocation that size on
+		 * every redraw eventually fails once physical memory
+		 * fragments (order-4..7 kmalloc failures under load).
+		 */
+		size_t max_chunk_px = mipi->tx_buf9_len / 3;
+		u8 *buf = mipi->tx_buf9;
 
+		gpiod_set_value_cansleep(mipi->dc, 1);
 
-// 	/* 8-bit configuration data, not 16-bit pixel data */
-			int buffSize = (num / 2) + (num & 1);
-			
-			buf = kmalloc(3 * buffSize * sizeof(u8), GFP_KERNEL);
-			if (!buf)
-				return -ENOMEM;
+		while (num >= 2) {
+			size_t chunk_px = min(num / 2, max_chunk_px);
+			size_t i;
 
+			for (i = 0; i < chunk_px; i++) {
+				u16 color = (par[2 * i] << 8) | par[2 * i + 1];
 
-			for (i = 0; i < buffSize; i++) {
-				u16 color = (par[2 * i] << 8) | (par[2 * i + 1]);
-
-				buf[3 * i] = ~((color & 0xF800) >> 8);
+				buf[3 * i]     = ~((color & 0xF800) >> 8);
 				buf[3 * i + 1] = ~((color & 0x07E0) >> 3);
 				buf[3 * i + 2] = ~((color & 0x1F) << 3);
-
 			}
 
-			num = buffSize * 3;
-			speed_hz = mipi_dbi_spi_cmd_max_speed(spi, num);
-			data = buf;
+			speed_hz = mipi_dbi_spi_cmd_max_speed(spi, chunk_px * 3);
+			ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, buf,
+						    chunk_px * 3);
+			if (ret)
+				goto out_unlock;
 
-		gpiod_set_value_cansleep(mipi->dc, 1);
-		ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, data, num);
-		kfree(buf);
-
-		return ret;
+			par += chunk_px * 2;
+			num -= chunk_px * 2;
+		}
 	} else {
-		
-		struct spi_device *spi = mipi->spi;
-		unsigned int bpw = 8;
-		u32 speed_hz;
-		int ret;
-
-		gpiod_set_value_cansleep(mipi->dc, 0);
-		speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 1);
-		ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, cmd, 1);
-		if (ret || !num)
-			return ret;
-
-		if (*cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes)
-			bpw = 16;
-
+		/*
+		 * Configuration parameters are always 8-bit here; the 16-bit
+		 * bpw case in the generic helper only applies to pixel data,
+		 * which is handled above.
+		 */
 		gpiod_set_value_cansleep(mipi->dc, 1);
 		speed_hz = mipi_dbi_spi_cmd_max_speed(spi, num);
-
-		return mipi_dbi_spi_transfer(spi, speed_hz, bpw, par, num);
+		ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, par, num);
 	}
-// 	struct spi_device *spi = mipi->spi;
-// 	void *data = par;
-// 	u32 speed_hz;
-// 	int i, ret;
-// 	__be16 *buf;
 
-// 	buf = kmalloc(32 * sizeof(u16), GFP_KERNEL);
-// 	if (!buf)
-// 		return -ENOMEM;
+ out_unlock:
+	spi_bus_unlock(spi->controller);
 
-// 	/*
-// 	 * The displays are Raspberry Pi HATs and connected to the 8-bit only
-// 	 * SPI controller, so 16-bit command and parameters need byte swapping
-// 	 * before being transferred as 8-bit on the big endian SPI bus.
-// 	 * Pixel data bytes have already been swapped before this function is
-// 	 * called.
-// 	 */
-// 	buf[0] = cpu_to_be16(*cmd);
-// 	gpiod_set_value_cansleep(mipi->dc, 0);
-// 	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 2);
-// 	ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, buf, 2);
-// 	if (ret || !num)
-// 		goto free;
-
-// 	/* 8-bit configuration data, not 16-bit pixel data */
-// 	if (num <= 32) {
-// 		for (i = 0; i < num; i++)
-// 			buf[i] = cpu_to_be16(par[i]);
-// 		num *= 2;
-// 		speed_hz = mipi_dbi_spi_cmd_max_speed(spi, num);
-// 		data = buf;
-// 	}
-
-// 	gpiod_set_value_cansleep(mipi->dc, 1);
-// 	ret = mipi_dbi_spi_transfer(spi, speed_hz, 8, data, num);
-//  free:
-// 	kfree(buf);
-
-// 	return ret;
+	return ret;
 }
 
 static void waveshare_enable(struct drm_simple_display_pipe *pipe,
@@ -366,6 +324,19 @@ static int ili9486_probe(struct spi_device *spi)
 	ret = mipi_dbi_spi_init(spi, dbi, dc);
 	if (ret)
 		return ret;
+
+	/*
+	 * dbi->tx_buf9 is unused for Type C Option 3 (dc gpio present), so
+	 * mipi_dbi_spi_init() left it NULL. Repurpose it as a fixed-size,
+	 * DMA-safe scratch buffer for waveshare_command()'s RGB565 -> 18-bit
+	 * conversion, allocated once here rather than kmalloc'd per screen
+	 * update. SZ_16K matches what the core uses for its own conversion
+	 * buffer and is a low enough order to allocate reliably at probe.
+	 */
+	dbi->tx_buf9_len = SZ_16K;
+	dbi->tx_buf9 = devm_kmalloc(dev, dbi->tx_buf9_len, GFP_KERNEL);
+	if (!dbi->tx_buf9)
+		return -ENOMEM;
 
 	dbi->command = waveshare_command;
 	// dbi->read_commands = NULL;
